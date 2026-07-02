@@ -1,4 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import HistoryView from '../views/HistoryView.vue'
+import HistoryDetailView from '../views/HistoryDetailView.vue'
 import RecordView from '../views/RecordView.vue'
 
 const router = createRouter({
@@ -6,6 +8,8 @@ const router = createRouter({
   routes: [
     { path: '/', redirect: '/record' },
     { path: '/record', component: RecordView },
+    { path: '/history', component: HistoryView },
+    { path: '/history/:date', component: HistoryDetailView },
     { path: '/:pathMatch(.*)*', redirect: '/record' },
   ],
 })

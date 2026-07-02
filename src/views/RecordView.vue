@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import BottomNav from '../components/BottomNav.vue'
 import ModuleRecordForm from '../components/ModuleRecordForm.vue'
 import ModuleSelector from '../components/ModuleSelector.vue'
 import SaveStatus from '../components/SaveStatus.vue'
@@ -29,7 +30,8 @@ const {
 } = useStudyRecords(initialDate)
 
 const dateInput = ref(initialDate)
-const manualMessage = ref('')
+const toastMessage = ref('')
+const toastTimer = ref(null)
 const allowedRouteDate = ref('')
 const revertingRouteDate = ref('')
 const isCalendarOpen = ref(false)
@@ -165,28 +167,45 @@ function confirmDiscardUnsaved() {
 function handleManualSave() {
   const result = save({ manual: true })
   if (result.ok) {
-    manualMessage.value = '保存完成'
+    showToast('保存完成')
   } else if (result.reason === SAVE_REASON.INVALID) {
-    manualMessage.value = '请先修正校验问题'
+    showToast('请先修正校验问题')
   } else if (result.reason === SAVE_REASON.TRANSIENT_EMPTY_NUMERIC) {
-    manualMessage.value = '请补全数字字段；如果要清零，请输入 0'
+    showToast('请补全数字字段；如果要清零，请输入 0')
   } else if (result.reason === SAVE_REASON.DELETE_CANCELED) {
-    manualMessage.value = '已取消删除'
+    showToast('已取消删除')
   } else if (result.reason === SAVE_REASON.SAVE_FAILED) {
-    manualMessage.value = '保存失败，请检查浏览器存储空间或本地数据状态。'
+    showToast('保存失败，请检查浏览器存储空间或本地数据状态。')
   } else {
-    manualMessage.value = ''
+    clearToast()
   }
 }
 
 function handleModuleSelect(key) {
   selectModule(key)
-  manualMessage.value = ''
+  clearToast()
 }
 
 function handleModuleUnselect(key) {
   requestUnselectModule(key)
-  manualMessage.value = ''
+  clearToast()
+}
+
+function showToast(message) {
+  clearToast()
+  toastMessage.value = message
+  toastTimer.value = window.setTimeout(() => {
+    toastMessage.value = ''
+    toastTimer.value = null
+  }, 1800)
+}
+
+function clearToast() {
+  if (toastTimer.value) {
+    window.clearTimeout(toastTimer.value)
+    toastTimer.value = null
+  }
+  toastMessage.value = ''
 }
 
 onBeforeRouteLeave(() => {
@@ -206,6 +225,7 @@ window.addEventListener('beforeunload', beforeUnload)
 
 onBeforeUnmount(() => {
   discardPendingAutosave()
+  clearToast()
   window.removeEventListener('beforeunload', beforeUnload)
 })
 
@@ -225,7 +245,7 @@ function formatDateLabel(dateKey) {
 </script>
 
 <template>
-  <main class="mx-auto min-h-svh max-w-md overflow-hidden bg-transparent pb-8 text-[#26324a]">
+  <main class="mx-auto min-h-svh max-w-md overflow-hidden bg-transparent pb-20 text-[#26324a]">
     <header class="sticky top-0 z-10 border-b border-white/70 bg-white/80 px-5 py-4 shadow-sm shadow-[#92A8D1]/20 backdrop-blur-xl">
       <div class="flex items-start justify-between gap-3">
         <div>
@@ -259,13 +279,13 @@ function formatDateLabel(dateKey) {
 
         <div
           v-if="isCalendarOpen"
-          class="fixed inset-0 z-30 bg-[#26324a]/35 backdrop-blur-[2px]"
+          class="fixed inset-0 z-40 bg-[#26324a]/35 backdrop-blur-[2px]"
           @click="isCalendarOpen = false"
         ></div>
 
         <div
           v-if="isCalendarOpen"
-          class="fixed left-1/2 top-24 z-40 w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 rounded-3xl border border-white/80 bg-white/95 p-4 shadow-2xl shadow-[#26324a]/20 backdrop-blur-xl"
+          class="fixed left-1/2 top-24 z-50 w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 rounded-3xl border border-white/80 bg-white/95 p-4 shadow-2xl shadow-[#26324a]/20 backdrop-blur-xl"
         >
           <div class="flex items-center justify-between">
             <button
@@ -397,7 +417,7 @@ function formatDateLabel(dateKey) {
         数据仅保存在当前设备。第一阶段先完成记录闭环，JSON 导出、历史、统计和 PWA 会在后续阶段实现。
       </section>
 
-      <div class="sticky bottom-0 -mx-5 border-t border-white/70 bg-white/85 px-5 py-3 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+      <section class="rounded-2xl bg-white/90 p-4 shadow-sm shadow-[#92A8D1]/20 ring-1 ring-white/80 backdrop-blur">
         <button
           type="button"
           class="w-full rounded-xl bg-[#6E84B7] px-4 py-3 text-base font-semibold text-white shadow-lg shadow-[#92A8D1]/40 transition hover:bg-[#6078ad] active:scale-[0.99]"
@@ -405,8 +425,16 @@ function formatDateLabel(dateKey) {
         >
           保存记录
         </button>
-        <p v-if="manualMessage" class="mt-2 text-center text-xs text-slate-600">{{ manualMessage }}</p>
-      </div>
+      </section>
     </div>
+
+    <div
+      v-if="toastMessage"
+      class="fixed left-1/2 top-24 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full bg-[#26324a] px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/20"
+    >
+      {{ toastMessage }}
+    </div>
+
+    <BottomNav v-if="!isCalendarOpen" />
   </main>
 </template>

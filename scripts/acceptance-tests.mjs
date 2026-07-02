@@ -4,6 +4,12 @@ import {
   normalizeDraftToRecord,
 } from '../src/domain/validators.js'
 import { STORAGE_KEY } from '../src/domain/constants.js'
+import {
+  createHistorySummaries,
+  getCorrectRateText,
+  getHistoryDetail,
+  getRecordEditPath,
+} from '../src/domain/statistics.js'
 import { studyRecordRepository } from '../src/repositories/studyRecordRepository.js'
 import { getLocalDateKey, isDateKey } from '../src/utils/date.js'
 
@@ -13,6 +19,7 @@ function moduleDraft(overrides = {}) {
     questionCount: '',
     wrongCount: '',
     wrongReasonTags: [],
+    customWrongReasons: [],
     note: '',
     ...overrides,
   }
@@ -192,6 +199,28 @@ function validRecord() {
   }
 }
 
+function historyRecord(date, moduleOverrides = {}, recordOverrides = {}) {
+  return {
+    date,
+    modules: {
+      dataAnalysis: {
+        studyMinutes: 30,
+        questionCount: 10,
+        wrongCount: 2,
+        wrongReasonTags: ['计算错误'],
+        customWrongReasons: [],
+        note: '',
+        ...moduleOverrides,
+      },
+    },
+    todayGain: '',
+    tomorrowFocus: '',
+    createdAt: `${date}T01:00:00.000Z`,
+    updatedAt: `${date}T02:00:00.000Z`,
+    ...recordOverrides,
+  }
+}
+
 test('repository starts from empty storage and saves valid record', () => {
   const store = installStorage()
   const result = studyRecordRepository.save(validRecord())
@@ -273,4 +302,122 @@ test('repository reports setItem failure without claiming saved', () => {
   installStorage(null, { throwOnSet: true })
   const result = studyRecordRepository.save(validRecord())
   assert.equal(result.ok, false)
+})
+
+test('history summaries are sorted by date descending', () => {
+  const summaries = createHistorySummaries({
+    '2026-07-01': historyRecord('2026-07-01'),
+    '2026-07-03': historyRecord('2026-07-03'),
+    '2026-07-02': historyRecord('2026-07-02'),
+  })
+
+  assert.deepEqual(summaries.map((summary) => summary.date), ['2026-07-03', '2026-07-02', '2026-07-01'])
+})
+
+test('empty records do not appear in history summaries', () => {
+  const summaries = createHistorySummaries({
+    '2026-07-01': {
+      date: '2026-07-01',
+      modules: {},
+      todayGain: '',
+      tomorrowFocus: '',
+      createdAt: '',
+      updatedAt: '',
+    },
+    '2026-07-02': historyRecord('2026-07-02'),
+  })
+
+  assert.deepEqual(summaries.map((summary) => summary.date), ['2026-07-02'])
+})
+
+test('selected but empty modules do not enter history summaries', () => {
+  const summaries = createHistorySummaries({
+    '2026-07-02': historyRecord(
+      '2026-07-02',
+      {
+        studyMinutes: 0,
+        questionCount: 0,
+        wrongCount: 0,
+        wrongReasonTags: [],
+        customWrongReasons: [],
+        note: '',
+      },
+      { tomorrowFocus: '复盘资料分析' },
+    ),
+  })
+
+  assert.equal(summaries[0].modules.length, 0)
+  assert.deepEqual(summaries[0].totals, { studyMinutes: 0, questionCount: 0, wrongCount: 0 })
+})
+
+test('history totals include study minutes, questions, and wrong answers', () => {
+  const summaries = createHistorySummaries({
+    '2026-07-02': historyRecord(
+      '2026-07-02',
+      { studyMinutes: 45, questionCount: 20, wrongCount: 4 },
+      {
+        modules: {
+          dataAnalysis: {
+            studyMinutes: 45,
+            questionCount: 20,
+            wrongCount: 4,
+            wrongReasonTags: [],
+            customWrongReasons: [],
+            note: '',
+          },
+          essay: {
+            studyMinutes: 35,
+            questionCount: 2,
+            wrongCount: 0,
+            wrongReasonTags: [],
+            customWrongReasons: [],
+            note: '',
+          },
+        },
+      },
+    ),
+  })
+
+  assert.deepEqual(summaries[0].totals, { studyMinutes: 80, questionCount: 22, wrongCount: 4 })
+})
+
+test('correct rate is empty when question count is zero', () => {
+  assert.equal(getCorrectRateText(0, 0), '')
+  assert.equal(getCorrectRateText(10, 2), '80%')
+})
+
+test('missing history date is handled safely', () => {
+  const detail = getHistoryDetail({ '2026-07-02': historyRecord('2026-07-02') }, '2026-07-03')
+  assert.equal(detail, null)
+})
+
+test('record edit path includes the target date query', () => {
+  assert.equal(getRecordEditPath('2026-07-02'), '/record?date=2026-07-02')
+})
+
+test('unknown modules or abnormal fields do not crash history calculations', () => {
+  const summaries = createHistorySummaries({
+    '2026-07-02': {
+      date: '2026-07-02',
+      modules: {
+        unknown: { studyMinutes: 999 },
+        dataAnalysis: {
+          studyMinutes: 'bad',
+          questionCount: 0,
+          wrongCount: 0,
+          wrongReasonTags: [],
+          customWrongReasons: [],
+          note: '错因复盘',
+        },
+      },
+      todayGain: '',
+      tomorrowFocus: '',
+      createdAt: '',
+      updatedAt: '',
+    },
+  })
+
+  assert.equal(summaries.length, 1)
+  assert.equal(summaries[0].modules.length, 1)
+  assert.deepEqual(summaries[0].totals, { studyMinutes: 0, questionCount: 0, wrongCount: 0 })
 })

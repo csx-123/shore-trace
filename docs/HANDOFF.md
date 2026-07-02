@@ -19,6 +19,8 @@
 
 - 今日/指定日期学习记录。
 - 日期切换和历史日期补录入口。
+- 历史记录列表和历史记录详情。
+- 历史记录编辑入口，跳转到 `/record?date=YYYY-MM-DD`。
 - 动态选择当天学习过的模块。
 - 记录学习分钟、做题数、错题数。
 - 固定错因标签。
@@ -31,7 +33,7 @@
 当前明确不做的功能：
 
 - 登录注册、后端服务、云同步、多设备同步。
-- 历史页、统计页、JSON 导出。
+- 统计页、JSON 导出。
 - PWA 安装、service worker、离线缓存、新版本提示。
 - AI 复盘、复杂规则建议、复杂趋势图。
 - 题型字典管理、题型标签统计。
@@ -59,12 +61,16 @@ src/
   style.css
   router/index.js
   views/RecordView.vue
+  views/HistoryView.vue
+  views/HistoryDetailView.vue
+  components/BottomNav.vue
   components/ModuleSelector.vue
   components/ModuleRecordForm.vue
   components/SaveStatus.vue
   composables/useStudyRecords.js
   domain/constants.js
   domain/saveState.js
+  domain/statistics.js
   domain/types.js
   domain/validators.js
   repositories/studyRecordRepository.js
@@ -80,13 +86,17 @@ docs/HANDOFF.md
 
 关键职责：
 
-- `src/views/RecordView.vue`：记录页组织、日期选择面板、路由日期参数处理、未保存修改确认、手动保存反馈。
+- `src/views/RecordView.vue`：记录页组织、日期选择面板、路由日期参数处理、未保存修改确认、手动保存与 toast 反馈。
+- `src/views/HistoryView.vue`：历史列表页，展示有效记录摘要、倒序列表、空状态和记录入口。
+- `src/views/HistoryDetailView.vue`：历史详情页，展示单日完整记录、缺失日期状态和编辑入口。
+- `src/components/BottomNav.vue`：移动端 tabbar 底部导航，在记录页和历史页之间切换，并在 `/record`、`/history`、`/history/:date` 正确显示激活状态。
 - `src/components/ModuleSelector.vue`：六个模块选择入口。
 - `src/components/ModuleRecordForm.vue`：单个模块的数字字段、错因标签、自定义错因、模块备注。
 - `src/components/SaveStatus.vue`：保存状态和最后保存时间展示。
 - `src/composables/useStudyRecords.js`：草稿状态、上一次成功保存记录、自动保存、手动保存、删除确认、即时汇总。
 - `src/domain/constants.js`：版本号、模块 key、错因标签、localStorage key。
 - `src/domain/validators.js`：草稿创建、记录归一化、校验、空模块/空记录判断。
+- `src/domain/statistics.js`：历史摘要、详情汇总、有效模块过滤、正确率和编辑链接等纯函数。
 - `src/repositories/studyRecordRepository.js`：localStorage 数据访问层，包含读取、保存、删除和异常保护。
 - `src/utils/date.js`：本地日期 key、日期校验、时间格式化。
 - `scripts/acceptance-tests.mjs`：当前自动化验收测试。
@@ -100,13 +110,20 @@ docs/HANDOFF.md
 - 完成程度：已实现 `/record` 页面，`/` 和未知路径会重定向到 `/record`。
 - 对应文件：`src/views/RecordView.vue`、`src/router/index.js`。
 - 验证情况：已通过 `npm test`、`npm run build`；曾用手机宽度视口检查页面加载、日期选择器遮罩、模块展开和错因布局。
-- 已知限制：没有历史页入口和统计页入口；刷新非法草稿不会恢复，只恢复最后一次合法保存的数据。
+- 已知限制：没有统计页入口；刷新非法草稿不会恢复，只恢复最后一次合法保存的数据。
+
+### 历史记录查看
+
+- 完成程度：已实现 `/history` 历史列表和 `/history/:date` 历史详情；列表只展示有效记录并按日期倒序排列；详情页支持跳转到 `/record?date=YYYY-MM-DD` 编辑；记录页、历史列表和历史详情通过 tabbar 底部导航切换。
+- 对应文件：`src/views/HistoryView.vue`、`src/views/HistoryDetailView.vue`、`src/components/BottomNav.vue`、`src/router/index.js`、`src/domain/statistics.js`。
+- 验证情况：测试覆盖历史排序、空记录过滤、空模块过滤、汇总计算、正确率空状态、缺失日期、编辑入口和异常字段兜底；已通过 `npm test`、`npm run build`；使用 430px 移动视口在系统 Chrome 中验证列表、详情、返回、编辑跳转、tabbar 底部导航和刷新后记录页日期恢复。
+- 已知限制：历史页只读取并展示已有本地数据；“编辑此记录”按钮是页面底部内容，不固定悬浮；未实现 JSON 导出、数据导入、统计页或自定义错因排行/筛选/复杂统计。
 
 ### 日期选择和补录
 
 - 完成程度：使用自定义日期选择面板，不使用原生日期 input；支持上月、下月、回到今天、选择日期；日期面板有遮罩层。
 - 对应文件：`src/views/RecordView.vue`、`src/utils/date.js`。
-- 验证情况：手机宽度检查过弹层和遮罩；日期工具有测试。
+- 验证情况：手机宽度检查过弹层和遮罩；日期工具有测试；日期面板打开时会隐藏底部 tabbar，避免弹层状态下切换底部导航。
 - 已知限制：日期选择器是当前页面内部实现，尚未抽出独立组件。
 
 ### 模块选择和模块表单
@@ -127,7 +144,7 @@ docs/HANDOFF.md
 
 - 完成程度：自动保存使用 700ms debounce；手动保存按钮固定在底部；保存状态区分已保存、正在编辑、存在未保存修改、存在校验问题、保存失败。
 - 对应文件：`src/composables/useStudyRecords.js`、`src/components/SaveStatus.vue`、`src/views/RecordView.vue`。
-- 验证情况：测试覆盖 repository 保存失败不声称已保存；之前手动验收过保存和刷新恢复。
+- 验证情况：测试覆盖 repository 保存失败不声称已保存；之前手动验收过保存和刷新恢复；手动保存按钮已改为页面底部内容，保存成功使用短暂 toast，顶部右上角状态更新为“已保存”。
 - 已知限制：没有端到端自动化测试覆盖浏览器中的 debounce 竞态；仅通过代码审查和手动验证降低风险。
 
 ### 校验和数据安全
@@ -148,9 +165,7 @@ docs/HANDOFF.md
 
 P0：下一步必须完成
 
-- 第二阶段历史页：`/history` 列表和 `/history/:date` 详情。
-- 历史记录编辑跳转：从详情页进入 `/record?date=YYYY-MM-DD`。
-- JSON 数据导出：导出完整 `{ version: 1, records: ... }`。
+- 任务 2B：JSON 数据导出，导出完整 `{ version: 1, records: ... }`。
 - 确保新增页面继续通过 repository 访问数据，不直接读写 localStorage。
 
 P1：MVP 内后续完成
@@ -173,7 +188,7 @@ P2：暂缓或后续版本考虑
 - 产品范围：第一版优先记录闭环，不做完整学习管理系统。原因是用户需要 60 秒内完成记录，并能连续使用。
 - 数据模型：顶层固定 `{ version: 1, records: Record<string, StudyRecord> }`。原因是便于未来版本迁移和导出。
 - 模块结构：记录中使用 `Partial<Record<ModuleKey, ModuleRecord>>`，只保存有实际内容的模块。原因是减少空数据污染和填写成本。
-- 路由设计：当前只实现 `/record`；原计划中的 `/history`、`/history/:date`、`/statistics` 尚未实现。编辑历史记录时应使用 `/record?date=YYYY-MM-DD`，保证刷新可恢复目标日期。
+- 路由设计：当前已实现 `/record`、`/history` 和 `/history/:date`；原计划中的 `/statistics` 尚未实现。编辑历史记录使用 `/record?date=YYYY-MM-DD`，刷新后可恢复目标日期。
 - 本地日期处理：使用 `getLocalDateKey(date)` 读取本地年月日，不使用 `toISOString().slice(0, 10)` 生成业务日期。原因是避免 UTC 日期偏移。
 - 自动保存策略：700ms debounce，自动保存不能删除已有记录。原因是减少数据丢失风险。
 - 手动保存策略：手动保存负责给用户明确反馈；全部清空已有记录时，只有手动保存才弹出删除确认。
@@ -338,15 +353,17 @@ ModuleRecord = {
 已验证：
 
 - `npm test`：通过。覆盖日期工具、空模块过滤、自定义错因、非法数字、错题数规则、repository 异常保护和 setItem 失败。
+- 历史页轻量测试：通过。覆盖历史记录倒序、空记录过滤、空模块过滤、汇总计算、做题数为 0 时正确率为空、缺失日期安全处理、编辑入口和异常字段兜底。
 - `npm run build`：通过。Vite 生产构建成功。
 - 开发服务器：曾验证可通过 Vite 本地开发命令启动；具体端口属于临时机器环境信息，不作为长期交接依据。
 - 页面手动测试：曾在移动端视口打开 `/record`，检查页面加载、日期面板、遮罩、模块选择、错因两行横向滑动、备注自适应。
+- 历史页手动测试：曾在 390px 移动视口用系统 Chrome 验证 `/history`、`/history/:date`、底部导航、返回历史列表、编辑跳转 `/record?date=YYYY-MM-DD`、刷新后恢复目标日期、缺失日期状态；未发现浏览器 console/page error。
 - Git：`main` 已推送到远程；当前 `phase-2-history-statistics` 分支已创建并推送到远程。
 
 未验证：
 
 - PWA 安装、manifest、service worker、离线访问、新版本提示：当前未实现。
-- 历史页、统计页、JSON 导出：当前未实现。
+- 统计页、JSON 导出：当前未实现。
 - 真实手机多浏览器测试：待确认。
 - 软键盘弹出时保存按钮在各种手机浏览器中的可访问性：待确认。
 - GitHub Actions/CI：仓库当前未发现 CI 配置。
@@ -357,23 +374,18 @@ ModuleRecord = {
 
 ## 11. 下一步推荐任务
 
-推荐任务名称：第二阶段第一步，开发历史记录查看与 JSON 导出。
+推荐任务名称：任务 2B，开发 JSON 数据导出。
 
 目标：
 
-- 实现 `/history` 和 `/history/:date`。
-- 历史列表只展示真实保存过的非空记录。
-- 详情页展示完整日期记录，并可跳转回 `/record?date=YYYY-MM-DD` 编辑。
 - 实现 JSON 导出按钮，导出完整顶层数据结构。
+- 保持历史页和记录页继续通过 repository 访问数据，不直接读写 localStorage。
 
 涉及文件：
 
-- `src/router/index.js`
-- `src/views/HistoryView.vue`（新建）
-- `src/views/HistoryDetailView.vue`（新建）
 - `src/repositories/studyRecordRepository.js`
-- `src/utils/date.js`
-- `src/domain/validators.js`（如需复用记录摘要判断，优先新增纯函数）
+- `src/views/HistoryView.vue` 或当前最合适的导出入口页面
+- `src/domain/statistics.js`（如需复用摘要，保持纯函数）
 - `scripts/acceptance-tests.mjs`
 - `README.md`（完成后再更新当前能力）
 
@@ -382,19 +394,12 @@ ModuleRecord = {
 1. 阅读 `AGENTS.md`（若存在）、`docs/HANDOFF.md`、README 和上述核心代码。
 2. 先确认当前分支为 `phase-2-history-statistics`，工作区干净。
 3. 为 repository 增加 `exportData()` 或等价方法，返回 `{ version: 1, records }`，不要让页面直接访问 localStorage。
-4. 增加历史列表页：从 `studyRecordRepository.getAll()` 读取，过滤非空记录，按日期倒序展示日期、总学习时长、总做题数、模块名、明日重点摘要。
-5. 增加历史详情页：展示模块、数字、错因、自定义错因、备注、今日收获、明日重点。
-6. 增加编辑入口：跳转 `/record?date=YYYY-MM-DD`。
-7. 增加 JSON 导出按钮：文件名 `gongkao-study-records-YYYY-MM-DD.json`，导出完整顶层结构。
-8. 增加轻量测试：repository 导出结构、历史摘要计算、空记录不展示。
-9. 运行 `npm test`、`npm run build`，再用手机宽度手动检查。
+4. 增加 JSON 导出按钮：文件名 `gongkao-study-records-YYYY-MM-DD.json`，导出完整顶层结构。
+5. 增加轻量测试：repository 导出结构、异常本地数据不被覆盖、导出内容包含完整 records。
+6. 运行 `npm test`、`npm run build`，再用手机宽度手动检查。
 
 验收标准：
 
-- 新日期只选择模块不填写内容时，历史页不出现该日期。
-- 历史页只展示 repository 中真实非空记录。
-- 历史列表日期倒序。
-- 详情页能完整展示记录并跳回正确日期编辑。
 - JSON 文件包含 `version: 1` 和完整 `records`。
 - 页面和 composable 不直接调用 `localStorage`。
 - `npm test` 和 `npm run build` 通过。
@@ -417,4 +422,4 @@ ModuleRecord = {
 3. 检查实际代码状态是否与交接文档一致，至少查看 `git status --short --branch`、`package.json`、`src/router/index.js`、`src/composables/useStudyRecords.js`、`src/repositories/studyRecordRepository.js`。
 4. 先向用户汇报理解和发现的差异。
 5. 未经确认不要扩大 MVP 范围。
-6. 从“下一步推荐任务”继续，优先开发第二阶段的历史记录查看与 JSON 导出。
+6. 从“下一步推荐任务”继续，优先开发任务 2B：JSON 数据导出。
