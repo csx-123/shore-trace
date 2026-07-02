@@ -259,7 +259,13 @@ function formatDateLabel(dateKey) {
 
         <div
           v-if="isCalendarOpen"
-          class="absolute left-4 right-4 top-[5.75rem] z-20 rounded-3xl border border-white/80 bg-white/95 p-4 shadow-2xl shadow-[#92A8D1]/30 backdrop-blur-xl"
+          class="fixed inset-0 z-30 bg-[#26324a]/35 backdrop-blur-[2px]"
+          @click="isCalendarOpen = false"
+        ></div>
+
+        <div
+          v-if="isCalendarOpen"
+          class="fixed left-1/2 top-24 z-40 w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 rounded-3xl border border-white/80 bg-white/95 p-4 shadow-2xl shadow-[#26324a]/20 backdrop-blur-xl"
         >
           <div class="flex items-center justify-between">
             <button
@@ -347,7 +353,7 @@ function formatDateLabel(dateKey) {
         @unselect="handleModuleUnselect"
       />
 
-      <div v-if="selectedModuleInfos.length" class="space-y-4">
+      <div v-if="selectedModuleInfos.length" class="space-y-3">
         <ModuleRecordForm
           v-for="moduleInfo in selectedModuleInfos"
           :key="moduleInfo.key"
