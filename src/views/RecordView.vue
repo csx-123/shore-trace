@@ -414,7 +414,7 @@ function formatDateLabel(dateKey) {
       </section>
 
       <section class="rounded-2xl bg-[#F7CAC9]/35 p-4 text-xs leading-5 text-[#72515b] ring-1 ring-[#F7CAC9]/50">
-        数据仅保存在当前设备。第一阶段先完成记录闭环，JSON 导出、历史、统计和 PWA 会在后续阶段实现。
+        数据仅保存在当前设备。可在历史页查看记录并导出 JSON；统计、PWA 和导入后续再做。
       </section>
 
       <section class="rounded-2xl bg-white/90 p-4 shadow-sm shadow-[#92A8D1]/20 ring-1 ring-white/80 backdrop-blur">
