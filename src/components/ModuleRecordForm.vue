@@ -102,12 +102,12 @@ function removeCustomReason(reason) {
         <div class="text-xs text-slate-500">固定错因</div>
         <div class="text-[11px] text-slate-400">横向滑动选择</div>
       </div>
-      <div class="mt-2 grid grid-flow-col grid-rows-2 auto-cols-[5.75rem] gap-1.5 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
+      <div class="mt-2 grid grid-flow-col grid-rows-2 auto-cols-[6.75rem] gap-1.5 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
         <button
           v-for="tag in WRONG_REASON_TAGS"
           :key="tag"
           type="button"
-          class="min-h-9 whitespace-nowrap rounded-xl border px-2 py-1.5 text-xs font-medium transition active:scale-[0.98]"
+          class="min-h-10 whitespace-normal break-keep rounded-xl border px-2 py-1 text-center text-[11px] leading-4 font-medium transition active:scale-[0.98]"
           :class="
             modelValue.wrongReasonTags.includes(tag)
               ? 'border-[#92A8D1] bg-[#92A8D1] text-white shadow-sm shadow-[#92A8D1]/30'
@@ -143,7 +143,7 @@ function removeCustomReason(reason) {
           v-for="reason in modelValue.customWrongReasons"
           :key="reason"
           type="button"
-          class="rounded-full border border-[#F7CAC9] bg-[#F7CAC9]/35 px-3 py-2 text-xs font-medium text-[#72515b]"
+          class="max-w-full break-all rounded-full border border-[#F7CAC9] bg-[#F7CAC9]/35 px-3 py-2 text-left text-xs font-medium text-[#72515b]"
           @click="removeCustomReason(reason)"
         >
           {{ reason }} ×

@@ -1,16 +1,60 @@
 <script setup>
+import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import BottomNav from '../components/BottomNav.vue'
 import { createHistorySummaries, getTomorrowFocusSummary } from '../domain/statistics.js'
 import { studyRecordRepository } from '../repositories/studyRecordRepository.js'
+import { getLocalDateKey } from '../utils/date.js'
 
 const result = studyRecordRepository.getAll()
 const repositoryError = result.error
 const summaries = createHistorySummaries(result.data.records)
+const exportMessage = ref('')
+const exportMessageType = ref('info')
 
 function formatDateLabel(dateKey) {
   const [year, month, day] = dateKey.split('-').map(Number)
   return `${year}年${month}月${day}日`
+}
+
+function exportRecords() {
+  setExportMessage('')
+  const exportResult = studyRecordRepository.exportData()
+  if (exportResult.error) {
+    setExportMessage('本地数据异常，暂时无法导出。', 'error')
+    return
+  }
+
+  if (Object.keys(exportResult.data.records).length === 0) {
+    setExportMessage('暂无可导出的已保存记录。请先保存一条记录。')
+    return
+  }
+
+  let url = ''
+  let link = null
+  try {
+    const content = JSON.stringify(exportResult.data, null, 2)
+    const blob = new Blob([content], { type: 'application/json;charset=utf-8' })
+    url = URL.createObjectURL(blob)
+    link = document.createElement('a')
+    link.href = url
+    link.download = `gongkao-study-records-${getLocalDateKey()}.json`
+    document.body.append(link)
+    link.click()
+    setExportMessage('导出已开始，请查看浏览器下载记录。')
+  } catch {
+    setExportMessage('导出失败，请稍后重试或更换浏览器。', 'error')
+  } finally {
+    link?.remove()
+    if (url) {
+      URL.revokeObjectURL(url)
+    }
+  }
+}
+
+function setExportMessage(message, type = 'info') {
+  exportMessage.value = message
+  exportMessageType.value = type
 }
 </script>
 
@@ -22,16 +66,32 @@ function formatDateLabel(dateKey) {
           <p class="text-xs font-semibold tracking-wide text-[#6E84B7]">历史记录</p>
           <h1 class="mt-1 text-2xl font-bold text-[#26324a]">学习记录历史</h1>
         </div>
-        <RouterLink
-          to="/record"
-          class="rounded-xl bg-[#6E84B7] px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-[#92A8D1]/30"
-        >
-          记录
-        </RouterLink>
+        <div class="flex shrink-0 gap-2">
+          <button
+            type="button"
+            class="rounded-xl bg-[#eef2fa] px-3 py-2 text-sm font-semibold text-[#4d5f8f]"
+            @click="exportRecords"
+          >
+            导出
+          </button>
+          <RouterLink
+            to="/record"
+            class="rounded-xl bg-[#6E84B7] px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-[#92A8D1]/30"
+          >
+            记录
+          </RouterLink>
+        </div>
       </div>
 
       <p v-if="repositoryError" class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
         本地数据读取异常，已使用安全空数据展示。
+      </p>
+      <p
+        v-if="exportMessage"
+        class="mt-3 rounded-lg px-3 py-2 text-xs"
+        :class="exportMessageType === 'error' ? 'bg-red-50 text-red-700' : 'bg-[#eef2fa] text-[#4d5f8f]'"
+      >
+        {{ exportMessage }}
       </p>
     </header>
 

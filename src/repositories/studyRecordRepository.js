@@ -144,6 +144,15 @@ export const studyRecordRepository = {
     return readData()
   },
 
+  exportData() {
+    const result = readData()
+    if (result.error) {
+      return { data: null, error: result.error }
+    }
+
+    return { data: result.data, error: null }
+  },
+
   getByDate(date) {
     const result = readData()
     return {

@@ -304,6 +304,44 @@ test('repository reports setItem failure without claiming saved', () => {
   assert.equal(result.ok, false)
 })
 
+test('repository exports empty app data from empty storage', () => {
+  installStorage()
+  const result = studyRecordRepository.exportData()
+  assert.equal(result.error, null)
+  assert.deepEqual(result.data, { version: 1, records: {} })
+})
+
+test('repository exports complete sanitized records', () => {
+  installStorage(
+    JSON.stringify({
+      version: 1,
+      records: {
+        '2026-07-01': historyRecord('2026-07-01'),
+        '2026-07-02': historyRecord('2026-07-02', { customWrongReasons: [' 概念混淆 ', '概念混淆'] }),
+      },
+    }),
+  )
+
+  const result = studyRecordRepository.exportData()
+  assert.equal(result.error, null)
+  assert.deepEqual(Object.keys(result.data.records), ['2026-07-01', '2026-07-02'])
+  assert.deepEqual(result.data.records['2026-07-02'].modules.dataAnalysis.customWrongReasons, ['概念混淆'])
+})
+
+test('repository export reports abnormal storage without overwriting it', () => {
+  let store = installStorage('{"version":1,"records":')
+  let result = studyRecordRepository.exportData()
+  assert.equal(result.data, null)
+  assert.ok(result.error)
+  assert.equal(store.get(STORAGE_KEY), '{"version":1,"records":')
+
+  store = installStorage('{"version":2,"records":{}}')
+  result = studyRecordRepository.exportData()
+  assert.equal(result.data, null)
+  assert.ok(result.error)
+  assert.equal(store.get(STORAGE_KEY), '{"version":2,"records":{}}')
+})
+
 test('history summaries are sorted by date descending', () => {
   const summaries = createHistorySummaries({
     '2026-07-01': historyRecord('2026-07-01'),

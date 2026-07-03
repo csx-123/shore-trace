@@ -245,7 +245,7 @@ function formatDateLabel(dateKey) {
 </script>
 
 <template>
-  <main class="mx-auto min-h-svh max-w-md overflow-hidden bg-transparent pb-20 text-[#26324a]">
+  <main class="mx-auto min-h-svh max-w-md bg-transparent pb-20 text-[#26324a]">
     <header class="sticky top-0 z-10 border-b border-white/70 bg-white/80 px-5 py-4 shadow-sm shadow-[#92A8D1]/20 backdrop-blur-xl">
       <div class="flex items-start justify-between gap-3">
         <div>
@@ -264,7 +264,7 @@ function formatDateLabel(dateKey) {
     </header>
 
     <div class="space-y-4 px-5 py-4">
-      <section class="relative z-20 rounded-2xl bg-white/90 p-4 shadow-sm shadow-[#92A8D1]/20 ring-1 ring-white/80 backdrop-blur">
+      <section class="relative rounded-2xl bg-white/90 p-4 shadow-sm shadow-[#92A8D1]/20 ring-1 ring-white/80 backdrop-blur">
         <div class="block">
           <span class="text-sm font-medium text-slate-700">记录日期</span>
           <button
