@@ -5,6 +5,9 @@ import { RouterLink, useRoute } from 'vue-router'
 const route = useRoute()
 
 const activeKey = computed(() => {
+  if (route.path.startsWith('/statistics')) {
+    return 'statistics'
+  }
   if (route.path.startsWith('/history')) {
     return 'history'
   }
@@ -14,7 +17,7 @@ const activeKey = computed(() => {
 
 <template>
   <nav class="fixed bottom-0 left-1/2 z-30 w-full max-w-md -translate-x-1/2 border-t border-[#e6ebf4] bg-white/95 px-6 pb-[calc(0.25rem+env(safe-area-inset-bottom))] pt-1 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-xl">
-    <div class="grid grid-cols-2">
+    <div class="grid grid-cols-3">
       <RouterLink
         to="/record"
         class="flex min-h-11 flex-col items-center justify-center gap-0.5 text-sm font-bold transition active:scale-[0.98]"
@@ -54,6 +57,31 @@ const activeKey = computed(() => {
           <path d="M12 9v3.4l2.2 1.3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
         历史
+      </RouterLink>
+      <RouterLink
+        to="/statistics"
+        class="flex min-h-11 flex-col items-center justify-center gap-0.5 text-sm font-bold transition active:scale-[0.98]"
+        :class="
+          activeKey === 'statistics'
+            ? 'text-[#2f6eea]'
+            : 'text-slate-500'
+        "
+      >
+        <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M6.75 18.25V12.5M12 18.25V6.75M17.25 18.25v-8"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+          <path
+            d="M5.25 18.25h13.5"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+          />
+        </svg>
+        统计
       </RouterLink>
     </div>
   </nav>

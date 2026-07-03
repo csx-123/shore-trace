@@ -1,7 +1,8 @@
-import { MODULES } from './constants.js'
+import { MODULES, WRONG_REASON_TAGS } from './constants.js'
 import { isDateKey } from '../utils/date.js'
 
 const moduleInfoByKey = new Map(MODULES.map((module) => [module.key, module]))
+const wrongReasonOrder = new Map(WRONG_REASON_TAGS.map((tag, index) => [tag, index]))
 
 function toNonNegativeInteger(value) {
   return Number.isInteger(value) && value >= 0 ? value : 0
@@ -131,4 +132,120 @@ export function getTomorrowFocusSummary(value, maxLength = 36) {
   }
 
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
+}
+
+export function createStatisticsSummary(records, referenceDateKey) {
+  const summaries = createHistorySummaries(records)
+  const effectiveReferenceDateKey = isDateKey(referenceDateKey) ? referenceDateKey : formatDateKey(new Date())
+  const weekRange = getWeekRange(effectiveReferenceDateKey)
+  const weekDataEnd = effectiveReferenceDateKey < weekRange.end ? effectiveReferenceDateKey : weekRange.end
+  const moduleStatsByKey = new Map(
+    MODULES.map((module) => [
+      module.key,
+      {
+        key: module.key,
+        label: module.label,
+        studyMinutes: 0,
+        questionCount: 0,
+        wrongCount: 0,
+        correctRateText: '',
+      },
+    ]),
+  )
+  const wrongReasonCounts = new Map()
+  let totalStudyMinutes = 0
+  let totalQuestionCount = 0
+  let totalWrongCount = 0
+  let weekStudyMinutes = 0
+  const weekStudyDates = new Set()
+
+  for (const summary of summaries) {
+    const inCurrentWeek = isDateInRange(summary.date, weekRange.start, weekDataEnd)
+
+    if (inCurrentWeek) {
+      weekStudyDates.add(summary.date)
+      weekStudyMinutes += summary.totals.studyMinutes
+    }
+
+    totalStudyMinutes += summary.totals.studyMinutes
+    totalQuestionCount += summary.totals.questionCount
+    totalWrongCount += summary.totals.wrongCount
+
+    for (const module of summary.modules) {
+      const moduleStats = moduleStatsByKey.get(module.key)
+      if (!moduleStats) {
+        continue
+      }
+
+      moduleStats.studyMinutes += module.studyMinutes
+      moduleStats.questionCount += module.questionCount
+      moduleStats.wrongCount += module.wrongCount
+
+      for (const tag of module.wrongReasonTags) {
+        if (wrongReasonOrder.has(tag)) {
+          wrongReasonCounts.set(tag, (wrongReasonCounts.get(tag) || 0) + 1)
+        }
+      }
+    }
+  }
+
+  const moduleStats = Array.from(moduleStatsByKey.values()).map((module) => ({
+    ...module,
+    correctRateText: getCorrectRateText(module.questionCount, module.wrongCount),
+  }))
+
+  return {
+    totalStudyDays: summaries.length,
+    totalStudyMinutes,
+    totalQuestionCount,
+    totalWrongCount,
+    totalCorrectRateText: getCorrectRateText(totalQuestionCount, totalWrongCount),
+    weekStudyDays: weekStudyDates.size,
+    weekStudyMinutes,
+    weekRange,
+    moduleStats,
+    wrongReasonRanking: Array.from(wrongReasonCounts.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((left, right) => {
+        if (right.count !== left.count) {
+          return right.count - left.count
+        }
+        return wrongReasonOrder.get(left.tag) - wrongReasonOrder.get(right.tag)
+      }),
+  }
+}
+
+function getWeekRange(referenceDateKey) {
+  const referenceDate = parseDateKey(referenceDateKey)
+  const weekStart = new Date(referenceDate)
+  const weekday = (weekStart.getDay() + 6) % 7
+  weekStart.setDate(weekStart.getDate() - weekday)
+
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekStart.getDate() + 6)
+
+  return {
+    start: formatDateKey(weekStart),
+    end: formatDateKey(weekEnd),
+  }
+}
+
+function isDateInRange(dateKey, startDateKey, endDateKey) {
+  return isDateKey(dateKey) && dateKey >= startDateKey && dateKey <= endDateKey
+}
+
+function parseDateKey(dateKey) {
+  if (!isDateKey(dateKey)) {
+    return null
+  }
+
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+function formatDateKey(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }

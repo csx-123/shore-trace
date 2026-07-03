@@ -6,6 +6,7 @@ import {
 import { STORAGE_KEY } from '../src/domain/constants.js'
 import {
   createHistorySummaries,
+  createStatisticsSummary,
   getCorrectRateText,
   getHistoryDetail,
   getRecordEditPath,
@@ -458,4 +459,120 @@ test('unknown modules or abnormal fields do not crash history calculations', () 
   assert.equal(summaries.length, 1)
   assert.equal(summaries[0].modules.length, 1)
   assert.deepEqual(summaries[0].totals, { studyMinutes: 0, questionCount: 0, wrongCount: 0 })
+})
+
+test('statistics summary aggregates total and current week study data', () => {
+  const summary = createStatisticsSummary(
+    {
+      '2026-06-28': historyRecord('2026-06-28', { studyMinutes: 20, questionCount: 5, wrongCount: 1 }),
+      '2026-06-29': historyRecord('2026-06-29', { studyMinutes: 30, questionCount: 10, wrongCount: 2 }),
+      '2026-07-02': historyRecord('2026-07-02', { studyMinutes: 40, questionCount: 20, wrongCount: 5 }),
+    },
+    '2026-07-03',
+  )
+
+  assert.equal(summary.totalStudyDays, 3)
+  assert.equal(summary.totalStudyMinutes, 90)
+  assert.equal(summary.totalQuestionCount, 35)
+  assert.equal(summary.totalWrongCount, 8)
+  assert.equal(summary.totalCorrectRateText, '77.1%')
+  assert.equal(summary.weekStudyDays, 2)
+  assert.equal(summary.weekStudyMinutes, 70)
+  assert.deepEqual(summary.weekRange, { start: '2026-06-29', end: '2026-07-05' })
+})
+
+test('statistics current week excludes future records after the reference date', () => {
+  const summary = createStatisticsSummary(
+    {
+      '2026-07-03': historyRecord('2026-07-03', { studyMinutes: 30, questionCount: 10, wrongCount: 1 }),
+      '2026-07-05': historyRecord('2026-07-05', { studyMinutes: 60, questionCount: 20, wrongCount: 2 }),
+    },
+    '2026-07-03',
+  )
+
+  assert.equal(summary.totalStudyDays, 2)
+  assert.equal(summary.totalStudyMinutes, 90)
+  assert.equal(summary.weekStudyDays, 1)
+  assert.equal(summary.weekStudyMinutes, 30)
+  assert.deepEqual(summary.weekRange, { start: '2026-06-29', end: '2026-07-05' })
+})
+
+test('statistics counts gain-only records as study days without module totals', () => {
+  const summary = createStatisticsSummary(
+    {
+      '2026-07-02': {
+        date: '2026-07-02',
+        modules: {},
+        todayGain: '复盘了资料分析错题',
+        tomorrowFocus: '',
+        createdAt: '2026-07-02T01:00:00.000Z',
+        updatedAt: '2026-07-02T02:00:00.000Z',
+      },
+    },
+    '2026-07-03',
+  )
+
+  assert.equal(summary.totalStudyDays, 1)
+  assert.equal(summary.weekStudyDays, 1)
+  assert.equal(summary.totalStudyMinutes, 0)
+  assert.equal(summary.moduleStats.every((module) => module.studyMinutes === 0), true)
+})
+
+test('statistics summary aggregates module totals and fixed wrong reason ranking', () => {
+  const summary = createStatisticsSummary(
+    {
+      '2026-07-01': historyRecord('2026-07-01', {}, {
+        modules: {
+          dataAnalysis: {
+            studyMinutes: 30,
+            questionCount: 10,
+            wrongCount: 2,
+            wrongReasonTags: ['计算错误', '粗心'],
+            customWrongReasons: ['概念混淆'],
+            note: '',
+          },
+          essay: {
+            studyMinutes: 50,
+            questionCount: 2,
+            wrongCount: 0,
+            wrongReasonTags: ['粗心'],
+            customWrongReasons: [],
+            note: '',
+          },
+        },
+      }),
+      '2026-07-02': historyRecord('2026-07-02', {
+        studyMinutes: 20,
+        questionCount: 5,
+        wrongCount: 1,
+        wrongReasonTags: ['计算错误'],
+      }),
+    },
+    '2026-07-03',
+  )
+
+  const dataAnalysis = summary.moduleStats.find((module) => module.key === 'dataAnalysis')
+  const essay = summary.moduleStats.find((module) => module.key === 'essay')
+  assert.deepEqual(
+    {
+      studyMinutes: dataAnalysis.studyMinutes,
+      questionCount: dataAnalysis.questionCount,
+      wrongCount: dataAnalysis.wrongCount,
+      correctRateText: dataAnalysis.correctRateText,
+    },
+    { studyMinutes: 50, questionCount: 15, wrongCount: 3, correctRateText: '80%' },
+  )
+  assert.deepEqual(
+    {
+      studyMinutes: essay.studyMinutes,
+      questionCount: essay.questionCount,
+      wrongCount: essay.wrongCount,
+      correctRateText: essay.correctRateText,
+    },
+    { studyMinutes: 50, questionCount: 2, wrongCount: 0, correctRateText: '100%' },
+  )
+  assert.deepEqual(summary.wrongReasonRanking, [
+    { tag: '计算错误', count: 2 },
+    { tag: '粗心', count: 2 },
+  ])
 })
