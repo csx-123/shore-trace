@@ -8,6 +8,10 @@ function emptyData() {
   return { version: APP_DATA_VERSION, records: {} }
 }
 
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value))
+}
+
 function sanitizeModule(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return { module: null, error: new Error('模块数据结构异常') }
@@ -58,7 +62,7 @@ function sanitizeRecord(value, fallbackDate) {
   if (value.modules && typeof value.modules === 'object' && !Array.isArray(value.modules)) {
     for (const [key, moduleValue] of Object.entries(value.modules)) {
       if (!moduleKeys.has(key)) {
-        return { record: null, error: new Error('存在未知模块 key') }
+        continue
       }
 
       const moduleResult = sanitizeModule(moduleValue)
@@ -97,11 +101,16 @@ function sanitizeRecord(value, fallbackDate) {
 
 function sanitizeData(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return { data: emptyData(), error: new Error('本地数据结构异常') }
+    return { data: emptyData(), rawData: null, error: new Error('本地数据结构异常') }
   }
 
-  if (value.version !== APP_DATA_VERSION || !value.records || typeof value.records !== 'object') {
-    return { data: emptyData(), error: new Error('本地数据版本或结构异常') }
+  if (
+    value.version !== APP_DATA_VERSION ||
+    !value.records ||
+    typeof value.records !== 'object' ||
+    Array.isArray(value.records)
+  ) {
+    return { data: emptyData(), rawData: null, error: new Error('本地数据版本或结构异常') }
   }
 
   const records = {}
@@ -112,31 +121,82 @@ function sanitizeData(value) {
 
     const recordResult = sanitizeRecord(recordValue, date)
     if (recordResult.error) {
-      return { data: emptyData(), error: recordResult.error }
+      return { data: emptyData(), rawData: null, error: recordResult.error }
     }
     if (recordResult.record) {
       records[date] = recordResult.record
     }
   }
 
-  return { data: { version: APP_DATA_VERSION, records }, error: null }
+  return { data: { version: APP_DATA_VERSION, records }, rawData: value, error: null }
 }
 
 function readData() {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) {
-      return { data: emptyData(), error: null }
+      const data = emptyData()
+      return { data, rawData: cloneJson(data), error: null }
     }
 
     return sanitizeData(JSON.parse(raw))
   } catch (error) {
-    return { data: emptyData(), error }
+    return { data: emptyData(), rawData: null, error }
   }
 }
 
 function writeData(data) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+}
+
+function mergeRecordIntoRawData(rawData, record) {
+  const nextData = cloneJson(rawData || emptyData())
+  if (!nextData.records || typeof nextData.records !== 'object' || Array.isArray(nextData.records)) {
+    nextData.records = {}
+  }
+
+  const existingRecord =
+    nextData.records[record.date] &&
+    typeof nextData.records[record.date] === 'object' &&
+    !Array.isArray(nextData.records[record.date])
+      ? nextData.records[record.date]
+      : {}
+  const existingModules =
+    existingRecord.modules && typeof existingRecord.modules === 'object' && !Array.isArray(existingRecord.modules)
+      ? existingRecord.modules
+      : {}
+  const mergedModules = {}
+
+  for (const [key, moduleValue] of Object.entries(existingModules)) {
+    if (!moduleKeys.has(key)) {
+      mergedModules[key] = moduleValue
+    }
+  }
+  for (const [key, moduleValue] of Object.entries(record.modules || {})) {
+    if (moduleKeys.has(key)) {
+      const existingModule =
+        existingModules[key] && typeof existingModules[key] === 'object' && !Array.isArray(existingModules[key])
+          ? existingModules[key]
+          : {}
+      mergedModules[key] = {
+        ...existingModule,
+        ...moduleValue,
+      }
+    }
+  }
+
+  nextData.version = APP_DATA_VERSION
+  nextData.records[record.date] = {
+    ...existingRecord,
+    date: record.date,
+    modules: mergedModules,
+    todayGain: record.todayGain,
+    tomorrowFocus: record.tomorrowFocus,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+  }
+
+  return nextData
 }
 
 export const studyRecordRepository = {
@@ -150,7 +210,7 @@ export const studyRecordRepository = {
       return { data: null, error: result.error }
     }
 
-    return { data: result.data, error: null }
+    return { data: cloneJson(result.rawData || result.data), error: null }
   },
 
   getByDate(date) {
@@ -168,8 +228,7 @@ export const studyRecordRepository = {
         return { ok: false, record: null, error: result.error }
       }
 
-      const data = result.data
-      data.records[record.date] = record
+      const data = mergeRecordIntoRawData(result.rawData, record)
       writeData(data)
       return { ok: true, record, error: null }
     } catch (error) {
@@ -184,7 +243,7 @@ export const studyRecordRepository = {
         return { ok: false, error: result.error }
       }
 
-      const data = result.data
+      const data = cloneJson(result.rawData || result.data)
       delete data.records[date]
       writeData(data)
       return { ok: true, error: null }
